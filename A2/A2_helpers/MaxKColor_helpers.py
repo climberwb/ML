@@ -1,10 +1,18 @@
 from mlrose_hiive.opt_probs.discrete_opt import DiscreteOpt
-from mlrose_hiive import QueensGenerator, MaxKColorGenerator, TSPGenerator, FourPeaks, FlipFlopGenerator, KnapsackGenerator
+from mlrose_hiive import TSPGenerator, FourPeaks, FlipFlopGenerator, KnapsackGenerator
 import mlrose_hiive
 from mlrose_hiive import SARunner, GARunner, NNGSRunner
 import numpy as np
 import pandas as pd
 
+import os 
+import sys
+
+sys.path.append(os.path.abspath("../"))
+from mlrose.mlrose_hiive.generators.max_k_color_generator import MaxKColorGenerator
+
+
+from .maximize_maxkcolor import MaxKColorGeneratorCustom
 def genaerate_problems_over_size(length = [ 20, 40, 80, 160 , 320 ]):
     """_summary_
 
@@ -21,11 +29,11 @@ def genaerate_problems_over_size(length = [ 20, 40, 80, 160 , 320 ]):
     # length = [ 20, 40, 80, 160 , 320 ]
     problems = []
     seed=5678
-    for l in length:                                                                                         # by default max_colors is 1 + 
-        problem =  MaxKColorGenerator().generate(seed=seed, number_of_nodes=l, max_connections_per_node=55, max_colors=None)
+    for l in length:   
+        problem =  MaxKColorGenerator().generate(seed, number_of_nodes=l,max_connections_per_node=length[-1],maximize =True)
 
-        maximum_expected = l - (t_pct* l + 1) +l
-        print(f"problem of size {l} for MaxKColorGenerator.")
+        maximum_expected = l*(l-1)/2
+        print(f"problem of size {l} for MaxKColorGenedddrator. maximum_expected: {maximum_expected} for size {l}")
         problems.append((l,problem))
     
     return problems
