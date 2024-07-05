@@ -26,6 +26,14 @@ from sklearn.model_selection import GridSearchCV
 import numpy as np
 from sklearn.decomposition import FastICA
 from sklearn.random_projection import GaussianRandomProjection
+from skorch import NeuralNetClassifier
+from skorch.callbacks import EpochScoring
+import torch
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.join('./', 'pyperch')))
+from pyperch.neural.backprop_nn import BackpropModule
+
 
 
 def preprocess_pipeline(X_train, list_of_category_columns):
@@ -139,6 +147,76 @@ def ICA_pipeline(X_train, list_of_categories=[], **kwargs):
     return ica_pipeline
 
 
+
+
+class CustomBackpropModule(BackpropModule):
+    def forward(self, X):
+        # Ensure the input is float32
+        X = X.to(torch.float32)
+        return super().forward(X)
+
+    def float(self):
+        # Convert all parameters to float32
+        for param in self.parameters():
+            param.data = param.data.float()
+        return self
+
+
+def NN_pipeline(X_train, list_of_categories, **kwargs):
+    """
+    NN_pipeline = Pipeline(steps=[
+        ('preprocessor', preprocessor),
+        ('classifier', NeuralNetClassifier(BackpropModule, **kwargs))
+    ])
+    MLPClassifier.__class__.__name__ = f'NN'
+    https://github.com/jlm429/pyperch/blob/master/notebooks/backprop_network.ipynb
+    """
+
+    # Define a function that converts data to numpy arrays
+    def to_numpy(X):
+        return np.array(X)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(device)
+    dict_of_params = {
+ 
+        "module__hidden_units": 10,
+        "module__hidden_layers": 1,
+        "module__activation": "tanh",
+        "max_epochs": 500,
+        "verbose": 0,
+        "lr": 0.05,
+            "batch_size": 128,
+        "iterator_train__shuffle": False
+    }
+    dict_of_params.update(kwargs)
+
+    # Define the F1 score callback for training and validation
+    train_f1 = EpochScoring(scoring='f1_macro', lower_is_better=False, on_train=True, name='train_f1')
+    valid_f1 = EpochScoring(scoring='f1_macro', lower_is_better=False, on_train=False, name='valid_f1')
+
+    net = NeuralNetClassifier(
+        module=CustomBackpropModule,
+        callbacks=[EpochScoring(scoring='accuracy', name='train_acc', on_train=True), ('train_f1', train_f1), ('valid_f1', valid_f1)],
+        #  train_split=predefined_split(dataset_valid),
+        criterion=torch.nn.CrossEntropyLoss,
+        optimizer = torch.optim.Adam,
+        device = device,
+        **dict_of_params
+    )
+
+    # HACK Ensure the module's weights are converted to float32
+    net.initialize()
+    net.module_.float()
+    preprocessor = preprocess_pipeline(X_train, list_of_categories)
+    net_pipeline = Pipeline(steps=[
+        ('preprocessor', preprocessor),
+        #  ('to_numpy', NumpyTransformer()),
+          #  ("dummy", FunctionTransformer(func=lambda x: print(x))),
+        ('classifier', net)
+    ])
+
+    net_pipeline.__class__.__name__ = f'NN'
+    return net_pipeline
 
 
 ################### TSNE PIPELINE ############################
