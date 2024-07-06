@@ -17,6 +17,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 import pandas as pd
 from helpers import seed_decorator
+# from pipelines import ICA_pipeline, RP_pipeline, PCA_pipeline, KMeans_pipeline, EM_pipeline
 
 
 CATEGORY_COLUMNS_UCML = [ 'Marital Status', 
@@ -107,3 +108,24 @@ def get_and_preprocess_raisin_data():
   y = predict_raison.data.targets
   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
   return X_train, X_test, y_train, y_test
+
+
+
+
+# @seed_decorator(seed=42)
+# def generate_best_pca_data(X_train, X_test, y_train, y_test, dataset='sdas'):
+#     assert dataset in ['sdas', 'raisin'], "Dataset must be either 'sdas' or 'raisin'."
+#     if dataset == 'sdas':
+#         list_of_categories = CATEGORY_COLUMNS_UCML
+#         best_n_components_pca = 154
+      
+#     elif dataset == 'raisin':
+#         list_of_categories = []
+#         best_n_components_pca = 3
+
+#     # Fit PCA for SDAS dataset
+#     pca_comp = PCA_pipeline(X_train, list_of_categories=list_of_categories, n_components=best_n_components_pca, random_state=42).fit_transform(X_train)
+#     pca_comp.fit(X_train)
+#     X_train_pca = pca_comp.transform(X_train)
+#     X_test_pca = pca_comp.transform(X_test)
+#     return X_train_pca, X_test_pca

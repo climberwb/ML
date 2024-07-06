@@ -7,6 +7,8 @@ from sklearn.model_selection import PredefinedSplit
 from sklearn.metrics import mean_squared_error, silhouette_score
 import matplotlib.pyplot as plt
 from helpers import seed_decorator, increase_font_size
+import time
+
 
 def kl_divergence_scorer(estimator, X):
     estimator.fit(X)
@@ -92,11 +94,12 @@ def average_abs_correlation(X_train):
     if type(correlation_matrix) == np.float64:
         return correlation_matrix
     # create nan mask
-    mask = np.isnan(correlation_matrix)
+    mask1 = ~np.isnan(correlation_matrix)
     
     # Create a mask to get the upper triangular matrix
-    mask = np.triu(np.ones_like(correlation_matrix, dtype=bool), k=1)
-    return (mask * correlation_matrix).sum().sum()/ np.sum(mask)
+    mask2 = np.triu(np.ones_like(correlation_matrix, dtype=bool), k=1)
+    mask = mask1 * mask2
+    return ( mask * correlation_matrix).sum().sum()/ np.sum(mask)
     
     
 @seed_decorator(seed=42)
@@ -270,3 +273,29 @@ def grid_search_gmm(X_train, category_columns, dataset_name):
     ).set(title=f'GMM Hyperparameter Tuning - {dataset_name}')
     
     return min_bic_score, best_params, df
+
+
+def measure_fit_time(pipeline, X, y=None):
+    start_time = time.time()
+    for i in range(5):
+        pipeline.fit(X, y)
+    end_time = time.time()
+    fit_time = (end_time - start_time)/5
+    return fit_time
+
+def measure_score_time(pipeline, X, y=None):
+    pipeline.fit(X,y=y)
+    if "predict" in dir(  pipeline):
+        start_time = time.time()
+        for i in range(5):
+            pipeline.predict(X)
+        end_time = time.time()
+        predict_time = (end_time - start_time)/5
+    else:
+        start_time = time.time()
+        for i in range(5):
+            pipeline.transform(X)
+       
+        end_time = time.time()
+        predict_time = (end_time - start_time)/5
+    return predict_time

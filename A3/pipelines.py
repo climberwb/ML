@@ -162,7 +162,7 @@ class CustomBackpropModule(BackpropModule):
         return self
 
 
-def NN_pipeline(X_train, list_of_categories, **kwargs):
+def NN_pipeline(X_train, list_of_categories, dr_pipeline = None,**kwargs):
     """
     NN_pipeline = Pipeline(steps=[
         ('preprocessor', preprocessor),
@@ -203,17 +203,19 @@ def NN_pipeline(X_train, list_of_categories, **kwargs):
         device = device,
         **dict_of_params
     )
-
+    preprocessor = preprocess_pipeline(X_train, list_of_categories)
+    steps = [
+        ('preprocessor', preprocessor),
+        ('dr_pipeline', dr_pipeline),
+        ('classifier', net)
+    ]
+    if dr_pipeline is None:
+        steps.pop(1)
     # HACK Ensure the module's weights are converted to float32
     net.initialize()
     net.module_.float()
-    preprocessor = preprocess_pipeline(X_train, list_of_categories)
-    net_pipeline = Pipeline(steps=[
-        ('preprocessor', preprocessor),
-        #  ('to_numpy', NumpyTransformer()),
-          #  ("dummy", FunctionTransformer(func=lambda x: print(x))),
-        ('classifier', net)
-    ])
+    
+    net_pipeline = Pipeline(steps=steps)
 
     net_pipeline.__class__.__name__ = f'NN'
     return net_pipeline
