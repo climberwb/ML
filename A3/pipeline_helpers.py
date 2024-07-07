@@ -8,6 +8,8 @@ from sklearn.metrics import mean_squared_error, silhouette_score
 import matplotlib.pyplot as plt
 from helpers import seed_decorator, increase_font_size
 import time
+# import Kfold
+from sklearn.model_selection import KFold
 
 
 def kl_divergence_scorer(estimator, X):
@@ -273,6 +275,31 @@ def grid_search_gmm(X_train, category_columns, dataset_name):
     ).set(title=f'GMM Hyperparameter Tuning - {dataset_name}')
     
     return min_bic_score, best_params, df
+
+
+@seed_decorator(seed=42)
+def run_and_get_avg_history(net_pipeline, X, y):
+    X = X  # Ensure X is a NumPy array
+    y = np.array(y)  # Ensure y is a NumPy array
+    cv = KFold(n_splits=4, shuffle=False)
+    train_losses = []
+    val_losses = []
+    for train_idx, val_idx in cv.split(X):
+        X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
+        y_train, y_val = y[train_idx], y[val_idx]
+        
+        history = net_pipeline.fit(X_train, y_train)['classifier']
+        
+        train_loss_per_epoch = [ his['train_loss']for his in history.history ] 
+        val_loss_per_epoch = [ his['valid_loss']for his in history.history ] 
+        
+        train_losses.append(train_loss_per_epoch)
+        val_losses.append(val_loss_per_epoch)
+    
+    avg_train_loss = np.mean(np.array(train_losses), axis=0)
+    avg_val_loss = np.mean(np.array(val_losses), axis=0)
+    
+    return avg_train_loss, avg_val_loss
 
 
 def measure_fit_time(pipeline, X, y=None):

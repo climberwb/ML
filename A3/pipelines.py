@@ -33,7 +33,7 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join('./', 'pyperch')))
 from pyperch.neural.backprop_nn import BackpropModule
-
+import helpers
 
 
 def preprocess_pipeline(X_train, list_of_category_columns):
@@ -150,6 +150,7 @@ def ICA_pipeline(X_train, list_of_categories=[], **kwargs):
 
 
 class CustomBackpropModule(BackpropModule):
+    
     def forward(self, X):
         # Ensure the input is float32
         X = X.to(torch.float32)
@@ -160,6 +161,8 @@ class CustomBackpropModule(BackpropModule):
         for param in self.parameters():
             param.data = param.data.float()
         return self
+    
+    
 
 
 def NN_pipeline(X_train, list_of_categories, dr_pipeline = None,**kwargs):
@@ -193,7 +196,7 @@ def NN_pipeline(X_train, list_of_categories, dr_pipeline = None,**kwargs):
     # Define the F1 score callback for training and validation
     train_f1 = EpochScoring(scoring='f1_macro', lower_is_better=False, on_train=True, name='train_f1')
     valid_f1 = EpochScoring(scoring='f1_macro', lower_is_better=False, on_train=False, name='valid_f1')
-
+    generate_seed()
     net = NeuralNetClassifier(
         module=CustomBackpropModule,
         callbacks=[EpochScoring(scoring='accuracy', name='train_acc', on_train=True), ('train_f1', train_f1), ('valid_f1', valid_f1)],
@@ -220,7 +223,83 @@ def NN_pipeline(X_train, list_of_categories, dr_pipeline = None,**kwargs):
     net_pipeline.__class__.__name__ = f'NN'
     return net_pipeline
 
+# Custom transformer for clustering and one-hot encoding
+class ClusterAndEncode(BaseEstimator, TransformerMixin):
+    def __init__(self, clusterer, **kwargs):
+        self.clusterer = clusterer
+        self.encoder = OneHotEncoder(sparse_output=False)
 
+    def fit(self, X, y=None):
+        clusters = self.clusterer.fit_predict(X)
+        self.encoder.fit(clusters.reshape(-1, 1))
+        return self
+
+    def transform(self, X, y=None):
+        clusters = self.clusterer.predict(X)
+        encoded_clusters = self.encoder.transform(clusters.reshape(-1, 1))
+        
+        return np.hstack((X, encoded_clusters))
+
+    def fit_transform(self, X, y=None):
+        
+        clusters = self.clusterer.fit_predict(X)
+        encoded_clusters = self.encoder.fit_transform(clusters.reshape(-1, 1))
+        return np.hstack((X, encoded_clusters))
+    
+    
+# Update the NN_pipeline to include clustering and one-hot encoding
+
+def NN_pipeline_with_clustering(X_train, list_of_categories,  kwargs_nn, kwargs_cluster, cluster_method='kmeans'):
+    def to_numpy(X):
+        return np.array(X)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(device)
+    dict_of_params = {
+        "module__hidden_units": 10,
+        "module__hidden_layers": 1,
+        "module__activation": "tanh",
+        "max_epochs": 500,
+        "verbose": 0,
+        "lr": 0.05,
+        "batch_size": 128,
+        "iterator_train__shuffle": False
+    }
+    dict_of_params.update(kwargs_nn)
+
+    train_f1 = EpochScoring(scoring='f1_macro', lower_is_better=False, on_train=True, name='train_f1')
+    valid_f1 = EpochScoring(scoring='f1_macro', lower_is_better=False, on_train=False, name='valid_f1')
+    generate_seed()
+    net = NeuralNetClassifier(
+        module=CustomBackpropModule,
+        callbacks=[EpochScoring(scoring='accuracy', name='train_acc', on_train=True), ('train_f1', train_f1), ('valid_f1', valid_f1)],
+        criterion=torch.nn.CrossEntropyLoss,
+        optimizer=torch.optim.Adam,
+        device=device,
+        **dict_of_params
+    )
+    
+    preprocessor = preprocess_pipeline(X_train, list_of_categories)
+
+    if cluster_method == 'kmeans':
+        clusterer = KMeans
+    elif cluster_method == 'gmm':
+        clusterer = GaussianMixture
+    else:
+        raise ValueError("Invalid cluster method. Choose 'kmeans' or 'gmm'.")
+    cluster_and_encode_instance = clusterer(**kwargs_cluster)
+    cluster_and_encode = ClusterAndEncode(cluster_and_encode_instance, **kwargs_cluster)
+
+    steps = [
+        ('preprocessor', preprocessor),
+        ('cluster_and_encode', cluster_and_encode),
+        ('classifier', net)
+    ]
+
+    net_pipeline = Pipeline(steps=steps)
+    net_pipeline.__class__.__name__ = 'NN'
+    
+    return net_pipeline
 ################### TSNE PIPELINE ############################
 def TSNE_pipeline(X_train, list_of_categories=[],**kwargs):
   # overrid classname
