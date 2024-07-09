@@ -10,8 +10,11 @@ from helpers import seed_decorator, increase_font_size
 import time
 # import Kfold
 from sklearn.model_selection import KFold
+from sklearn.metrics import precision_score, recall_score
+import pandas as pd
 
-
+# from scikit learn import LabelEncoder
+from sklearn.preprocessing import LabelEncoder
 def kl_divergence_scorer(estimator, X):
     estimator.fit(X)
     return estimator.named_steps['classifier'].kl_divergence_
@@ -326,3 +329,45 @@ def measure_score_time(pipeline, X, y=None):
         end_time = time.time()
         predict_time = (end_time - start_time)/5
     return predict_time
+
+
+
+
+def cluster_label_counts(y_true, cluster_labels, label_mapping):
+    """
+    Count the number of true labels for each cluster
+    :param y_true: The true labels
+    :param cluster_labels: The cluster labels
+    :param label_mapping: A mapping from encoded labels to original labels
+    :return: A DataFrame with the number of true labels for each cluster
+    """
+    # Create a DataFrame with the true labels and cluster labels
+    df = pd.DataFrame({'True Labels': y_true, 'Cluster Labels': cluster_labels})
+    # Create a mapping from cluster labels to true labels
+    cluster_to_label = df.groupby('Cluster Labels')['True Labels'].agg(lambda x: x.value_counts().index[0])
+    # Create a DataFrame with the number of true labels for each cluster
+    cluster_label_counts = df.groupby('Cluster Labels')['True Labels'].value_counts().unstack().fillna(0)
+
+    return cluster_label_counts
+
+
+
+
+def calculate_precision_recall(y_true, cluster_labels, label_mapping):
+    # Convert the labels to numerical values if they are categorical
+    le = LabelEncoder()
+    y_true_encoded = le.fit_transform(y_true)
+    cluster_labels_encoded = le.transform(cluster_labels)
+    
+    # Calculate precision and recall for each class
+    precision = precision_score(y_true_encoded, cluster_labels_encoded, average=None)
+    recall = recall_score(y_true_encoded, cluster_labels_encoded, average=None)
+    
+    class_labels = le.classes_
+    precision_recall_df = pd.DataFrame({
+        'Class': class_labels,
+        'Precision': precision,
+        'Recall': recall
+    })
+    
+    return precision_recall_df

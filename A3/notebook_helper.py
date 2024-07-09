@@ -23,3 +23,7 @@ def generate_seed():
 def reload_notebook_cell():
   reload_all()
   generate_seed()
+  
+  
+  
+  
