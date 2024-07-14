@@ -237,6 +237,11 @@ class ClusterAndEncode(BaseEstimator, TransformerMixin):
     def transform(self, X, y=None):
         clusters = self.clusterer.predict(X)
         encoded_clusters = self.encoder.transform(clusters.reshape(-1, 1))
+        # if type(self.clusterer) == GaussianMixture:
+        #     encoded_clusters = self.clusterer.predict_proba(X) 
+        # else:
+        #     encoded_clusters = self.clusterer.transform(X)
+        #     encoded_clusters /= encoded_clusters.sum(axis=1, keepdims=True)
         
         return np.hstack((X, encoded_clusters))
 
@@ -244,6 +249,14 @@ class ClusterAndEncode(BaseEstimator, TransformerMixin):
         
         clusters = self.clusterer.fit_predict(X)
         encoded_clusters = self.encoder.fit_transform(clusters.reshape(-1, 1))
+        
+        # if type(self.clusterer) == GaussianMixture:
+        #     encoded_clusters = self.clusterer.predict_proba(X) 
+        # else:
+        #     encoded_clusters = self.clusterer.transform(X)
+        #     encoded_clusters /= encoded_clusters.sum(axis=1, keepdims=True)
+         
+            
         return np.hstack((X, encoded_clusters))
     
     
